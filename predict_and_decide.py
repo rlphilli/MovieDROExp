@@ -197,4 +197,62 @@ for epoch in range(15):
 
 
 
-  
+# This is the experimental bit
+results = []
+score_cutoff = cutoff
+local_genres = ['Drama', 'War', 'Children']
+minimum_genre_size = np.min([len(movies2[movies2[genre] == True])  for genre in local_genres])
+
+sample_size = 100
+group_performances = [] #(group, mixture, performance tuples)
+# generate simplex proportions
+
+number_of_films_to_recommend = 10
+
+for i in range(50000):
+    if i%1000== 0 :
+        print(i)
+
+    prop_alphas = np.random.exponential(1, 3)
+    prop_alphas = np.round(prop_alphas/np.sum(prop_alphas)*sample_size)
+
+    samples = []
+    for genre, number_to_pick in zip(local_genres, prop_alphas):
+        genre_indices = movies2[movies2[genre] == True]
+        genre_indices
+        genre_indices = genre_indices.movieId.values.tolist()
+        samples += choices(train_idxs,k=int(number_to_pick))
+
+    # get predictions
+
+    input_rows = []
+    for j in samples:
+        input_rows.append(film_array[movie_index_to_array_row_map[j], :])
+    input_matrix = torch.tensor(np.array(input_rows), requires_grad=False).float()
+
+    dro_model.eval()
+    preds = dro_model(input_matrix)
+
+    top_k = [item for idx, item in enumerate(samples) 
+             if idx in preds.detach().numpy()[:, 1].argsort()[-number_of_films_to_recommend:].tolist()]   
+
+    local_res = are_there_good_films(movies2, top_k, local_genres, score=score_cutoff)
+
+
+    results.append(prop_alphas.tolist() + local_res + ['DRO'])
+
+    # ERM
+    erm_clf.eval()
+    preds = erm_clf(input_matrix)
+
+    top_k = [item for idx, item in enumerate(samples) 
+             if idx in preds.detach().numpy()[:, 1].argsort()[-number_of_films_to_recommend:].tolist()]   
+
+    local_res = are_there_good_films(movies2, top_k, local_genres,  score=score_cutoff)
+
+
+    results.append(prop_alphas.tolist() + local_res + ['ERM'])
+
+
+
+
